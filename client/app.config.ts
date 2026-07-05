@@ -45,28 +45,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ],
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": `允许VolumePreset App访问您的相册，以便您上传或保存图片。`,
-          "cameraPermission": `允许VolumePreset App使用您的相机，以便您直接拍摄照片上传。`,
-          "microphonePermission": `允许VolumePreset App访问您的麦克风，以便您拍摄带有声音的视频。`
-        }
-      ],
-      [
-        "expo-location",
-        {
-          "locationWhenInUsePermission": `VolumePreset App需要访问您的位置以提供周边服务及导航功能。`
-        }
-      ],
-      [
-        "expo-camera",
-        {
-          "cameraPermission": `VolumePreset App需要访问相机以拍摄照片和视频。`,
-          "microphonePermission": `VolumePreset App需要访问麦克风以录制视频声音。`,
-          "recordAudioAndroid": true
-        }
       ]
     ],
     "experiments": {
