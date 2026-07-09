@@ -286,6 +286,23 @@ export default function VolumePresetsScreen() {
             />
             <FontAwesome6 name="volume-high" size={14} color="#9AA0A6" />
           </View>
+          <View style={styles.adjustRow}>
+            <TouchableOpacity
+              style={styles.adjustBtn}
+              onPress={() => applyVolume(currentVolume - 1)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.adjustBtnText}>−</Text>
+            </TouchableOpacity>
+            <Text style={styles.adjustLabel}>1% step</Text>
+            <TouchableOpacity
+              style={styles.adjustBtn}
+              onPress={() => applyVolume(currentVolume + 1)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.adjustBtnText}>+</Text>
+            </TouchableOpacity>
+          </View>
           <Text style={styles.sliderHint}>Drag to fine-tune system volume</Text>
         </View>
 
@@ -435,6 +452,39 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#9AA0A6',
     marginTop: 8,
+  },
+  adjustRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 24,
+    marginTop: 12,
+  },
+  adjustBtn: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: PRIMARY,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  adjustBtnText: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    lineHeight: 32,
+  },
+  adjustLabel: {
+    fontSize: 13,
+    color: '#5F6368',
+    fontWeight: '500',
+    minWidth: 60,
+    textAlign: 'center',
   },
   sectionHeader: {
     flexDirection: 'row',
