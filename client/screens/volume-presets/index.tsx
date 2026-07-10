@@ -15,6 +15,7 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { Screen } from '@/components/Screen';
 import { VolumeManager } from 'react-native-volume-manager';
+import { useSafeRouter } from '@/hooks/useSafeRouter';
 import PresetCard from './PresetCard';
 import PresetDialog from './PresetDialog';
 
@@ -33,6 +34,7 @@ export default function VolumePresetsScreen() {
   const [dialogVisible, setDialogVisible] = useState(false);
   const [editingPreset, setEditingPreset] = useState<VolumePreset | null>(null);
 
+  const router = useSafeRouter();
   const soundRef = useRef<Audio.Sound | null>(null);
   const volumeListenerRef = useRef<{ remove: () => void } | null>(null);
   const isChangingFromSlider = useRef(false);
@@ -352,6 +354,21 @@ export default function VolumePresetsScreen() {
         )}
       </ScrollView>
 
+      {/* 隐私政策入口 */}
+      <View style={styles.footerLinks}>
+        <TouchableOpacity
+          onPress={() => router.push('/privacy')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.footerLink}>隐私政策</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* 广告 Banner 占位区域 */}
+      <View style={styles.adBanner}>
+        <Text style={styles.adBannerText}>广告位</Text>
+      </View>
+
       <PresetDialog
         key={getDialogKey()}
         visible={dialogVisible}
@@ -540,5 +557,29 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#9AA0A6',
     marginTop: 4,
+  },
+  footerLinks: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+  },
+  footerLink: {
+    fontSize: 13,
+    color: '#9AA0A6',
+  },
+  adBanner: {
+    height: 56,
+    backgroundColor: '#E8EAED',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#DADCE0',
+  },
+  adBannerText: {
+    fontSize: 13,
+    color: '#9AA0A6',
+    fontWeight: '500',
   },
 });
