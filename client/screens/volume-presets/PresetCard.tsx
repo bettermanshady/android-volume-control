@@ -59,7 +59,7 @@ export default function PresetCard({
           onPress={onApply}
           activeOpacity={0.8}
         >
-          <Text style={styles.applyText}>Apply</Text>
+          <Text style={styles.applyText}>应用</Text>
         </TouchableOpacity>
       </View>
     </View>

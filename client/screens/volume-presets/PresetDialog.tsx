@@ -46,11 +46,11 @@ export default function PresetDialog({
         >
           <View>
             <Text style={styles.title}>
-              {editingPreset ? 'Edit Preset' : 'New Preset'}
+              {editingPreset ? '编辑预设' : '新建预设'}
             </Text>
 
             <TextInput
-              label="Preset Name"
+              label="预设名称"
               value={name}
               onChangeText={setName}
               mode="outlined"
@@ -66,7 +66,7 @@ export default function PresetDialog({
 
             <View style={styles.sliderSection}>
               <View style={styles.sliderHeader}>
-                <Text style={styles.sliderLabel}>Volume</Text>
+                <Text style={styles.sliderLabel}>音量</Text>
                 <Text style={styles.sliderValue}>{volume}%</Text>
               </View>
               <Slider
@@ -88,7 +88,7 @@ export default function PresetDialog({
                 style={styles.cancelBtn}
                 labelStyle={styles.cancelLabel}
               >
-                Cancel
+                取消
               </Button>
               <Button
                 mode="contained"
@@ -97,7 +97,7 @@ export default function PresetDialog({
                 labelStyle={styles.saveLabel}
                 buttonColor={PRIMARY}
               >
-                Save
+                保存
               </Button>
             </View>
           </View>

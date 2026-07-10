@@ -46,9 +46,9 @@ export default function VolumePresetsScreen() {
         setPresets(JSON.parse(stored));
       } else {
         const defaults: VolumePreset[] = [
-          { id: '1', name: 'Quiet', volume: 30 },
-          { id: '2', name: 'Normal', volume: 50 },
-          { id: '3', name: 'Loud', volume: 80 },
+          { id: '1', name: '安静', volume: 30 },
+          { id: '2', name: '正常', volume: 50 },
+          { id: '3', name: '响亮', volume: 80 },
         ];
         setPresets(defaults);
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(defaults));
@@ -180,10 +180,10 @@ export default function VolumePresetsScreen() {
 
   // Delete preset with confirmation
   const handleDelete = (id: string) => {
-    Alert.alert('Delete Preset', 'Are you sure you want to delete this preset?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert('删除预设', '确定要删除这个预设吗？', [
+      { text: '取消', style: 'cancel' },
       {
-        text: 'Delete',
+        text: '删除',
         style: 'destructive',
         onPress: () => {
           savePresets(presets.filter((p) => p.id !== id));
@@ -251,9 +251,9 @@ export default function VolumePresetsScreen() {
             <FontAwesome6 name="volume-high" size={22} color={PRIMARY} />
           </View>
           <View>
-            <Text style={styles.headerTitle}>Volume Presets</Text>
+            <Text style={styles.headerTitle}>智控音量</Text>
             <Text style={styles.headerSubtitle}>
-              Manage and quickly switch volume levels
+              管理和快速切换音量
             </Text>
           </View>
         </View>
@@ -266,7 +266,7 @@ export default function VolumePresetsScreen() {
       >
         {/* Current Volume Card */}
         <View style={styles.volumeCard}>
-          <Text style={styles.volumeLabel}>Current Volume</Text>
+          <Text style={styles.volumeLabel}>当前音量</Text>
           <View style={styles.volumeDisplay}>
             <Text style={styles.volumeNumber}>{currentVolume}</Text>
             <Text style={styles.volumeUnit}>%</Text>
@@ -294,7 +294,7 @@ export default function VolumePresetsScreen() {
             >
               <Text style={styles.adjustBtnText}>−</Text>
             </TouchableOpacity>
-            <Text style={styles.adjustLabel}>1% step</Text>
+            <Text style={styles.adjustLabel}>步进 1%</Text>
             <TouchableOpacity
               style={styles.adjustBtn}
               onPress={() => applyVolume(currentVolume + 1)}
@@ -303,20 +303,20 @@ export default function VolumePresetsScreen() {
               <Text style={styles.adjustBtnText}>+</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.sliderHint}>Drag to fine-tune system volume</Text>
+          <Text style={styles.sliderHint}>拖动滑块微调系统音量</Text>
         </View>
 
         {/* Presets Section */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>
-            Presets
+            预设列表
             {presets.length > 0 && (
               <Text style={styles.sectionCount}> ({presets.length})</Text>
             )}
           </Text>
           <TouchableOpacity style={styles.addBtn} onPress={handleAdd}>
             <FontAwesome6 name="plus" size={12} color={PRIMARY} />
-            <Text style={styles.addBtnText}>Add</Text>
+            <Text style={styles.addBtnText}>添加</Text>
           </TouchableOpacity>
         </View>
 
@@ -344,9 +344,9 @@ export default function VolumePresetsScreen() {
             <View style={styles.emptyIcon}>
               <FontAwesome6 name="sliders" size={28} color="#DADCE0" />
             </View>
-            <Text style={styles.emptyText}>No presets yet</Text>
+            <Text style={styles.emptyText}>暂无预设</Text>
             <Text style={styles.emptyHint}>
-              Tap Add to create your first volume preset
+              点击「添加」创建第一个音量预设
             </Text>
           </View>
         )}
