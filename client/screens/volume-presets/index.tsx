@@ -18,6 +18,9 @@ import { VolumeManager } from 'react-native-volume-manager';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
 import PresetCard from './PresetCard';
 import PresetDialog from './PresetDialog';
+import AdBanner from '@/components/AdBanner';
+import PrivacyConsentModal from '@/components/PrivacyConsentModal';
+import { hasPrivacyConsent } from '@/utils/adService';
 
 const PRIMARY = '#1A73E8';
 const STORAGE_KEY = 'volume_presets';
@@ -33,12 +36,22 @@ export default function VolumePresetsScreen() {
   const [currentVolume, setCurrentVolume] = useState(50);
   const [dialogVisible, setDialogVisible] = useState(false);
   const [editingPreset, setEditingPreset] = useState<VolumePreset | null>(null);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
   const router = useSafeRouter();
   const soundRef = useRef<Audio.Sound | null>(null);
   const volumeListenerRef = useRef<{ remove: () => void } | null>(null);
   const isChangingFromSlider = useRef(false);
   const sliderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 检查隐私政策同意状态
+  useEffect(() => {
+    const checkPrivacy = async () => {
+      const accepted = await hasPrivacyConsent();
+      setPrivacyAccepted(accepted);
+    };
+    checkPrivacy();
+  }, []);
 
   // Load presets from AsyncStorage
   const loadPresets = useCallback(async () => {
@@ -364,10 +377,20 @@ export default function VolumePresetsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 广告 Banner 占位区域 */}
-      <View style={styles.adBanner}>
-        <Text style={styles.adBannerText}>广告位</Text>
-      </View>
+      {/* 广告 Banner - 芒果联盟聚合广告（仅隐私同意后展示） */}
+      {privacyAccepted && (
+        <AdBanner
+          adUnitId="__测试广告ID__"
+          height={60}
+          onAdLoad={() => console.log('广告加载成功')}
+          onAdError={(error) => console.log('广告加载失败:', error)}
+        />
+      )}
+
+      {/* 隐私合规确认弹窗 */}
+      <PrivacyConsentModal
+        onAccepted={() => setPrivacyAccepted(true)}
+      />
 
       <PresetDialog
         key={getDialogKey()}
@@ -568,18 +591,5 @@ const styles = StyleSheet.create({
   footerLink: {
     fontSize: 13,
     color: '#9AA0A6',
-  },
-  adBanner: {
-    height: 56,
-    backgroundColor: '#E8EAED',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#DADCE0',
-  },
-  adBannerText: {
-    fontSize: 13,
-    color: '#9AA0A6',
-    fontWeight: '500',
   },
 });
