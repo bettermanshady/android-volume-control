@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { AD_CONFIG, generateBannerAdHtml } from '@/utils/adService';
+import { useAppTheme } from '@/contexts/ThemeContext';
 
 interface AdBannerProps {
   /** 广告位 ID，默认使用配置中的测试 ID */
@@ -36,6 +37,8 @@ export default function AdBanner({
   const [error, setError] = useState(false);
   const webViewRef = useRef<any>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
 
   // 广告加载成功回调
   const handleAdLoaded = () => {
@@ -102,7 +105,7 @@ export default function AdBanner({
       {/* 加载指示器 */}
       {loading && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="small" color="#9AA0A6" />
+          <ActivityIndicator size="small" color={colors.textMuted} />
         </View>
       )}
 
@@ -129,32 +132,33 @@ export default function AdBanner({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-    backgroundColor: '#E8EAED',
-    borderTopWidth: 1,
-    borderTopColor: '#DADCE0',
-    overflow: 'hidden',
-  },
-  webView: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#E8EAED',
-    zIndex: 1,
-  },
-  fallbackContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fallbackText: {
-    fontSize: 13,
-    color: '#9AA0A6',
-    fontWeight: '500',
-  },
-});
+const createStyles = (colors: ReturnType<typeof useAppTheme>['colors']) =>
+  StyleSheet.create({
+    container: {
+      width: '100%',
+      backgroundColor: colors.adBg,
+      borderTopWidth: 1,
+      borderTopColor: colors.adBorder,
+      overflow: 'hidden',
+    },
+    webView: {
+      flex: 1,
+      backgroundColor: 'transparent',
+    },
+    loadingOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.adBg,
+      zIndex: 1,
+    },
+    fallbackContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    fallbackText: {
+      fontSize: 13,
+      color: colors.textMuted,
+      fontWeight: '500',
+    },
+  });

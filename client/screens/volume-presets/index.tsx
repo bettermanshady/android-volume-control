@@ -16,13 +16,15 @@ import Slider from '@react-native-community/slider';
 import { Screen } from '@/components/Screen';
 import { VolumeManager } from 'react-native-volume-manager';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
+import { AppColors } from '@/utils/appTheme';
+import { useAppTheme } from '@/contexts/ThemeContext';
+import { useNotification } from '@/contexts/NotificationContext';
 import PresetCard from './PresetCard';
 import PresetDialog from './PresetDialog';
 import AdBanner from '@/components/AdBanner';
 import PrivacyConsentModal from '@/components/PrivacyConsentModal';
 import { hasPrivacyConsent } from '@/utils/adService';
 
-const PRIMARY = '#1A73E8';
 const STORAGE_KEY = 'volume_presets';
 
 interface VolumePreset {
@@ -39,10 +41,14 @@ export default function VolumePresetsScreen() {
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
   const router = useSafeRouter();
+  const { colors, isDark, setMode } = useAppTheme();
+  const { syncVolume } = useNotification();
   const soundRef = useRef<Audio.Sound | null>(null);
   const volumeListenerRef = useRef<{ remove: () => void } | null>(null);
   const isChangingFromSlider = useRef(false);
   const sliderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const PRIMARY = colors.primary;
 
   // 检查隐私政策同意状态
   useEffect(() => {
@@ -52,6 +58,11 @@ export default function VolumePresetsScreen() {
     };
     checkPrivacy();
   }, []);
+
+  // 音量变化时同步通知栏控件
+  useEffect(() => {
+    syncVolume(currentVolume);
+  }, [currentVolume, syncVolume]);
 
   // Load presets from AsyncStorage
   const loadPresets = useCallback(async () => {
@@ -162,7 +173,6 @@ export default function VolumePresetsScreen() {
       isChangingFromSlider.current = true;
       VolumeManager.setVolume(clamped / 100);
       setCurrentVolume(clamped);
-      // Reset flag after a short delay to allow the change to propagate
       setTimeout(() => {
         isChangingFromSlider.current = false;
       }, 300);
@@ -258,18 +268,44 @@ export default function VolumePresetsScreen() {
     }, 50);
   };
 
+  const styles = createStyles(colors, PRIMARY);
+
   return (
-    <Screen safeAreaEdges={['left', 'right']}>
+    <Screen safeAreaEdges={['left', 'right']} statusBarStyle={isDark ? 'light' : 'dark'}>
       <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <View style={styles.headerIconContainer}>
-            <FontAwesome6 name="volume-high" size={22} color={PRIMARY} />
+        <View style={styles.headerRow}>
+          <View style={styles.headerContent}>
+            <View style={styles.headerIconContainer}>
+              <FontAwesome6 name="volume-high" size={22} color={PRIMARY} />
+            </View>
+            <View>
+              <Text style={styles.headerTitle}>智控音量</Text>
+              <Text style={styles.headerSubtitle}>
+                管理和快速切换音量
+              </Text>
+            </View>
           </View>
-          <View>
-            <Text style={styles.headerTitle}>智控音量</Text>
-            <Text style={styles.headerSubtitle}>
-              管理和快速切换音量
-            </Text>
+          <View style={styles.headerActions}>
+            {/* 一键切换浅色/深色（跟随系统时快捷切到浅色） */}
+            <TouchableOpacity
+              style={styles.headerActionBtn}
+              onPress={() => setMode(isDark ? 'light' : 'dark')}
+              activeOpacity={0.7}
+            >
+              <FontAwesome6
+                name={isDark ? 'sun' : 'moon'}
+                size={18}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+            {/* 更多设置入口 */}
+            <TouchableOpacity
+              style={styles.headerActionBtn}
+              onPress={() => router.push('/settings')}
+              activeOpacity={0.7}
+            >
+              <FontAwesome6 name="gear" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -287,7 +323,7 @@ export default function VolumePresetsScreen() {
             <Text style={styles.volumeUnit}>%</Text>
           </View>
           <View style={styles.sliderRow}>
-            <FontAwesome6 name="volume-low" size={14} color="#9AA0A6" />
+            <FontAwesome6 name="volume-low" size={14} color={colors.textMuted} />
             <Slider
               style={styles.slider}
               minimumValue={0}
@@ -296,10 +332,10 @@ export default function VolumePresetsScreen() {
               value={currentVolume}
               onValueChange={handleSliderChange}
               minimumTrackTintColor={PRIMARY}
-              maximumTrackTintColor="#DADCE0"
+              maximumTrackTintColor={colors.track}
               thumbTintColor={PRIMARY}
             />
-            <FontAwesome6 name="volume-high" size={14} color="#9AA0A6" />
+            <FontAwesome6 name="volume-high" size={14} color={colors.textMuted} />
           </View>
           <View style={styles.adjustRow}>
             <TouchableOpacity
@@ -357,7 +393,7 @@ export default function VolumePresetsScreen() {
         {presets.length === 0 && (
           <View style={styles.emptyState}>
             <View style={styles.emptyIcon}>
-              <FontAwesome6 name="sliders" size={28} color="#DADCE0" />
+              <FontAwesome6 name="sliders" size={28} color={colors.track} />
             </View>
             <Text style={styles.emptyText}>暂无预设</Text>
             <Text style={styles.emptyHint}>
@@ -403,193 +439,216 @@ export default function VolumePresetsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  header: {
-    paddingTop: Platform.OS === 'web' ? 20 : 56,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E8EAED',
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: 'rgba(26, 115, 232, 0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1F1F1F',
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    color: '#5F6368',
-    marginTop: 2,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  volumeCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 24,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 3,
-    marginBottom: 28,
-    alignItems: 'center',
-  },
-  volumeLabel: {
-    fontSize: 13,
-    color: '#5F6368',
-    fontWeight: '500',
-    letterSpacing: 0.5,
-  },
-  volumeDisplay: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginVertical: 8,
-  },
-  volumeNumber: {
-    fontSize: 56,
-    fontWeight: '700',
-    color: PRIMARY,
-    fontVariant: ['tabular-nums'],
-  },
-  volumeUnit: {
-    fontSize: 22,
-    fontWeight: '500',
-    color: '#5F6368',
-    marginLeft: 2,
-  },
-  sliderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-    marginTop: 8,
-    gap: 8,
-  },
-  slider: {
-    flex: 1,
-    height: 40,
-  },
-  sliderHint: {
-    fontSize: 12,
-    color: '#9AA0A6',
-    marginTop: 8,
-  },
-  adjustRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 24,
-    marginTop: 12,
-  },
-  adjustBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: PRIMARY,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: PRIMARY,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  adjustBtnText: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    lineHeight: 32,
-  },
-  adjustLabel: {
-    fontSize: 13,
-    color: '#5F6368',
-    fontWeight: '500',
-    minWidth: 60,
-    textAlign: 'center',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F1F1F',
-  },
-  sectionCount: {
-    color: '#9AA0A6',
-    fontWeight: '400',
-  },
-  addBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(26, 115, 232, 0.08)',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 6,
-  },
-  addBtnText: {
-    color: PRIMARY,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  presetList: {
-    gap: 0,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 48,
-  },
-  emptyIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#F1F3F4',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#5F6368',
-    fontWeight: '500',
-  },
-  emptyHint: {
-    fontSize: 13,
-    color: '#9AA0A6',
-    marginTop: 4,
-  },
-  footerLinks: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-  },
-  footerLink: {
-    fontSize: 13,
-    color: '#9AA0A6',
-  },
-});
+const createStyles = (colors: AppColors, PRIMARY: string) =>
+  StyleSheet.create({
+    header: {
+      paddingTop: Platform.OS === 'web' ? 20 : 56,
+      paddingHorizontal: 20,
+      paddingBottom: 20,
+      backgroundColor: colors.headerBg,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    headerContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    },
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    headerActionBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.iconBg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerIconContainer: {
+      width: 44,
+      height: 44,
+      borderRadius: 14,
+      backgroundColor: colors.primarySoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 14,
+    },
+    headerTitle: {
+      fontSize: 22,
+      fontWeight: '700',
+      color: colors.textPrimary,
+    },
+    headerSubtitle: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
+    scrollView: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    scrollContent: {
+      padding: 20,
+      paddingBottom: 40,
+      backgroundColor: colors.background,
+    },
+    volumeCard: {
+      backgroundColor: colors.cardBg,
+      borderRadius: 20,
+      padding: 24,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.06,
+      shadowRadius: 12,
+      elevation: 3,
+      marginBottom: 28,
+      alignItems: 'center',
+    },
+    volumeLabel: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      fontWeight: '500',
+      letterSpacing: 0.5,
+    },
+    volumeDisplay: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      marginVertical: 8,
+    },
+    volumeNumber: {
+      fontSize: 56,
+      fontWeight: '700',
+      color: PRIMARY,
+      fontVariant: ['tabular-nums'],
+    },
+    volumeUnit: {
+      fontSize: 22,
+      fontWeight: '500',
+      color: colors.textSecondary,
+      marginLeft: 2,
+    },
+    sliderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      width: '100%',
+      marginTop: 8,
+      gap: 8,
+    },
+    slider: {
+      flex: 1,
+      height: 40,
+    },
+    sliderHint: {
+      fontSize: 12,
+      color: colors.textMuted,
+      marginTop: 8,
+    },
+    adjustRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 24,
+      marginTop: 12,
+    },
+    adjustBtn: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: PRIMARY,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: PRIMARY,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 6,
+      elevation: 4,
+    },
+    adjustBtnText: {
+      fontSize: 28,
+      fontWeight: '700',
+      color: colors.primaryText,
+      lineHeight: 32,
+    },
+    adjustLabel: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      fontWeight: '500',
+      minWidth: 60,
+      textAlign: 'center',
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.textPrimary,
+    },
+    sectionCount: {
+      color: colors.textMuted,
+      fontWeight: '400',
+    },
+    addBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.primarySoft,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 20,
+      gap: 6,
+    },
+    addBtnText: {
+      color: PRIMARY,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    presetList: {
+      gap: 0,
+    },
+    emptyState: {
+      alignItems: 'center',
+      paddingVertical: 48,
+    },
+    emptyIcon: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: colors.emptyIconBg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 16,
+    },
+    emptyText: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      fontWeight: '500',
+    },
+    emptyHint: {
+      fontSize: 13,
+      color: colors.textMuted,
+      marginTop: 4,
+    },
+    footerLinks: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 20,
+      backgroundColor: colors.background,
+    },
+    footerLink: {
+      fontSize: 13,
+      color: colors.textMuted,
+    },
+  });

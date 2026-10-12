@@ -1,4 +1,6 @@
 import { AuthProvider } from '@/contexts/AuthContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import { NotificationProvider } from '@/contexts/NotificationContext';
 import { type ReactNode } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { WebOnlyColorSchemeUpdater } from './ColorSchemeUpdater';
@@ -10,13 +12,17 @@ function Provider({ children }: { children: ReactNode }) {
   return <WebOnlyColorSchemeUpdater>
     <WebOnlyPrettyScrollbar>
       <AuthProvider>
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <HeroUINativeProvider>
-            <PaperProvider>
-              {children}
-            </PaperProvider>
-          </HeroUINativeProvider>
-        </GestureHandlerRootView>
+        <ThemeProvider>
+          <NotificationProvider>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+              <HeroUINativeProvider>
+                <PaperProvider>
+                  {children}
+                </PaperProvider>
+              </HeroUINativeProvider>
+            </GestureHandlerRootView>
+          </NotificationProvider>
+        </ThemeProvider>
       </AuthProvider>
     </WebOnlyPrettyScrollbar>
   </WebOnlyColorSchemeUpdater>

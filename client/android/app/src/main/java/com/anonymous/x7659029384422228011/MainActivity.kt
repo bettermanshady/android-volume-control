@@ -1,6 +1,8 @@
 package com.anonymous.x7659029384422228011
 import expo.modules.splashscreen.SplashScreenManager
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 
@@ -12,6 +14,30 @@ import com.facebook.react.defaults.DefaultReactActivityDelegate
 import expo.modules.ReactActivityDelegateWrapper
 
 class MainActivity : ReactActivity() {
+
+  companion object {
+    const val VOLUME_PERMISSION_REQUEST_CODE = 7401
+  }
+
+  private var permissionResultCallback: ((Boolean) -> Unit)? = null
+
+  fun setPermissionResultCallback(callback: (Boolean) -> Unit) {
+    permissionResultCallback = callback
+  }
+
+  override fun onRequestPermissionsResult(
+    requestCode: Int,
+    permissions: Array<out String>,
+    grantResults: IntArray
+  ) {
+    super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+    if (requestCode == VOLUME_PERMISSION_REQUEST_CODE) {
+      val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+      permissionResultCallback?.invoke(granted)
+      permissionResultCallback = null
+    }
+  }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     // Set the theme to AppTheme BEFORE onCreate to support
     // coloring the background, status bar, and navigation bar.
