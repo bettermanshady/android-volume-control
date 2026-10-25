@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { AD_CONFIG, generateBannerAdHtml } from '@/utils/adService';
+import { ADS_ENABLED } from '@/config/features';
 import { useAppTheme } from '@/contexts/ThemeContext';
 
 interface AdBannerProps {
@@ -68,7 +69,7 @@ export default function AdBanner({
 
   // 自动刷新广告
   useEffect(() => {
-    if (AD_CONFIG.REFRESH_INTERVAL > 0 && visible && !error) {
+    if (ADS_ENABLED && AD_CONFIG.REFRESH_INTERVAL > 0 && visible && !error) {
       refreshTimerRef.current = setInterval(() => {
         if (webViewRef.current) {
           webViewRef.current.reload();
@@ -83,6 +84,11 @@ export default function AdBanner({
       }
     };
   }, [visible, error]);
+
+  // 全局广告开关关闭时：不渲染广告位、不请求广告接口
+  if (!ADS_ENABLED) {
+    return null;
+  }
 
   // 不显示时返回 null
   if (!visible) {

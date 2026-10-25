@@ -24,6 +24,7 @@ import PresetDialog from './PresetDialog';
 import AdBanner from '@/components/AdBanner';
 import PrivacyConsentModal from '@/components/PrivacyConsentModal';
 import { hasPrivacyConsent } from '@/utils/adService';
+import { ADS_ENABLED } from '@/config/features';
 
 const STORAGE_KEY = 'volume_presets';
 
@@ -384,8 +385,8 @@ export default function VolumePresetsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 广告 Banner - 芒果联盟聚合广告（仅隐私同意后展示） */}
-      {privacyAccepted && (
+      {/* 广告 Banner - 芒果联盟聚合广告（需全局开关开启 且 用户已同意隐私后展示） */}
+      {ADS_ENABLED && privacyAccepted && (
         <AdBanner
           adUnitId="__测试广告ID__"
           height={60}

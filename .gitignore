@@ -100,3 +100,15 @@ expo-env.d.ts
 *.tsbuildinfo
 node-compile-cache/
 .codegraph
+
+# ===== Open-source hardening =====
+# Secrets & signing material
+.env*
+credentials.json
+*.keystore
+*.jks
+signing*
+# Android gradle build cache
+android/.gradle/
+# iOS CocoaPods
+ios/Pods/

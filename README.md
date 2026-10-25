@@ -1,261 +1,114 @@
-# Expo App + Express.js
+# 智控音量（Android Volume Control）
 
-## 目录结构规范（严格遵循）
+一个轻量、开源的 Android 系统媒体音量控制工具，用于快速保存和应用音量预设，并在通知栏提供便捷的 ± 音量控件。数据完全保存在本地，不收集任何个人信息。
 
-当前仓库是一个 monorepo（基于 pnpm 的 workspace）
+## 功能特性
 
-- Expo 代码在 client 目录，Express.js 代码在 server 目录
-- 本模板默认无 Tab Bar，可按需改造
+- **预设音量**：内置「安静 / 正常 / 响亮」三档预设，一键应用到系统媒体音量。
+- **自定义预设**：自由新增、编辑、删除属于自己的音量预设（百分比）。
+- **按档位加减**：滑块与按钮按本机媒体音量的**真实档位**步进，杜绝“百分比映射不稳定”。
+- **深色模式**：支持浅色 / 深色 / 跟随系统，一键切换。
+- **通知栏控件**：在通知栏常驻音量调节卡片，可快速 ± 调整媒体音量。
+- **测试提示音**：应用预设时可播放提示音试听实际音量大小。
+- **可选广告**：默认关闭，通过统一开关开启（见下文「广告」）。
 
-├── client/                     # React Native 前端代码
-│   ├── app/                    # Expo Router 路由目录（仅路由配置）
-│   │   ├── _layout.tsx         # 根布局文件（必需，务必阅读）
-│   │   └── index.tsx           # 首页
-│   ├── screens/                # 页面实现目录（与 app/ 路由对应）
-│   │   └── demo/               # 示例页面
-│   │       └── index.tsx
-│   ├── components/             # 可复用组件
-│   │   └── Screen.tsx          # 页面容器组件（必用）
-│   ├── hooks/                  # 自定义 Hooks
-│   ├── contexts/               # React Context 代码
-│   ├── utils/                  # 工具函数
-│   ├── assets/                 # 静态资源
-|   └── package.json            # Expo 应用 package.json
-├── server/                     # 服务端代码根目录 (Express.js)
-|   ├── src/
-│   │   └── index.ts            # 服务端入口文件
-|   └── package.json            # 服务端 package.json
-├── package.json
-├── .cozeproj                   # 预置脚手架脚本（禁止修改）
-└── .coze                       # 配置文件（禁止修改）
+## 技术栈
 
-## 样式方案
+- **React Native / Expo 54**（Expo Router、expo-av、react-native-volume-manager 等）
+- **Android 原生（Kotlin）**：自建原生模块 `VolumeControl` 与通知栏控件 `VolumeNotification`
+- **本地存储**：AsyncStorage（音量预设、主题、开关状态）
 
-基于 tailwindcss 进行样式开发（底层基于 Uniwind）
+## 目录结构
 
-写法示例：
-
-```tsx
-<View className="flex-1 bg-white dark:bg-gray-900 p-4"></View>
+```text
+client/
+├── app/                    # Expo Router 路由配置
+├── screens/volume-presets/ # 主页面（音量预设 + 滑块 + 通知栏联动）
+├── screens/settings/       # 设置页（主题、通知开关、隐私）
+├── screens/privacy/        # 隐私政策页
+├── components/             # 复用组件（Screen / AdBanner / PrivacyConsentModal 等）
+├── config/features.ts      # 全局功能开关（含广告开关）
+├── utils/
+│   ├── volumeEngine.ts     # 统一音量引擎（百分比⇄档位换算、写后回读）
+│   ├── volumeNotification.ts # 通知栏控件 JS 桥接
+│   └── adService.ts        # 广告服务层（WebView 方案）
+├── contexts/               # React Context（主题 / 通知）
+└── android/                # 原生 Android 工程（Kotlin 模块）
 ```
 
-```tsx
-<Text
-  className="text-lg font-bold text-gray-900 dark:text-white"
-  selectionColorClassName="accent-blue-500"
->
-  Hello World
-</Text>
-```
+## 音量档位说明
 
-Uniwind 官方文档：https://docs.uniwind.dev/llms.txt
+系统媒体音量是**整数档位**（不是连续的 0-100）。本应用以系统实际档位为唯一基准：
 
-## 如何进行静态校验（TSC + ESLint）
+- 百分比到档位使用**四舍五入**换算：`index = round(percent / 100 * max)`。
+- 每次设置后都会**回读系统档位**并反算百分比，保证界面显示的数字永远等于真实档位。
+- 不同设备的档位数不同（通常 15 档），因此**每档对应的百分比也因设备而异**，无法做到精确 1% 的连续调节。
+- 主界面会显示“本机媒体音量共 N 档，每档约 X%”，帮助理解这一系统限制。
+
+## 本地运行与构建
+
+> 项目使用 pnpm workspace（`client/` 为 Expo 前端，`server/` 为 Express 后端，本应用实际只需要前端）。
 
 ```bash
-# 对 client 和 server 目录同时进行校验
-pnpm -w lint:all
+# 1. 安装根依赖
+npm install
 
-# 对 client 目录进行校验
-pnpm -w lint:client
+# 2. 安装前端（client）依赖
+cd client && npm install
 
-# 对 server 目录进行校验
-pnpm -w lint:server
+# 3. 启动开发（Expo 开发服务器）
+npx expo start
+
+# 4. 构建 Android APK（需在 client 目录并配置好 EAS）
+cd client
+npm install -g eas-cli
+eas login
+eas build -p android
 ```
 
-## 如何修改主题模式（跟随系统、固定暗色、固定亮色）
+> 提示：客户端依赖建议使用 `npx expo install <pkg>` 安装，以确保与 SDK 版本兼容。
 
-默认为跟随系统，如果用户明确指定为“暗色”或“亮色”，需要修改 `client/components/ColorSchemeUpdater.tsx` 的 `DEFAULT_THEME` 变量为合适的值
+## 配置
 
-## 如何定制主题 design tokens
+### 广告（默认关闭）
 
-当前项目的**设计系统**基于 tailwindcss 实现，核心入口文件为 `client/global.css`，如果需要定制主题，应该**阅读并修改 `client/global.css` 文件**
+广告功能通过统一开关控制，默认**关闭**。
 
-## 路由及 Tab Bar 实现规范
+- 关闭状态下：**不初始化广告 SDK、不请求广告接口、不渲染任何广告位**，广告代码与依赖完整保留但不会执行。
+- 开启方式：编辑 `client/config/features.ts`，将
 
-### 方案一：无 Tab Bar（Stack 导航）
-
-适用于线性流程应用，采用简化的目录结构：
-
-```
-client/app/
-├── _layout.tsx         # 根布局（Stack 导航配置）
-├── index.tsx           # 应用入口
-├── detail.tsx          # 详情页（通过 params 传递数据）
-└── +not-found.tsx      # 404 页面
+```ts
+export const ADS_ENABLED = false;
 ```
 
-**根布局配置** `client/app/_layout.tsx`：
+改为
 
-以下仅为代码片段供写法参考
-
-```tsx
-<Stack screenOptions={{ headerShown: false }}>
-  <Stack.Screen name="index" />
-  <Stack.Screen name="detail" />
-</Stack>
+```ts
+export const ADS_ENABLED = true;
 ```
 
-**应用入口** `client/app/index.tsx`：
-```tsx
-export { default } from "@/screens/home";
-```
-> **禁止事项**：无 Tab Bar 场景下，不得创建 `(tabs)` 目录。
+之后在 `client/utils/adService.ts` 中把测试广告位 ID 替换为你的正式广告位 ID，并（如需真实广告）将占位 HTML 替换为对应广告平台的 SDK 接入即可。
 
-### 方案二：有 Tab Bar（Tabs 导航）
+> 当前广告实现为 WebView 占位方案，未内联任何真实广告 SDK；仅作展示位预留。
 
-采用路由分组实现底部导航栏：
-```
-client/app/
-├── _layout.tsx              # 根布局
-├── (tabs)/
-│   ├── _layout.tsx          # Tab 导航配置
-│   ├── index.tsx            # 默认 Tab（必须存在）
-│   ├── discover.tsx         # 发现页
-│   └── profile.tsx          # 个人中心
-├── detail.tsx               # Tab 外的独立页面（通过 params 传递数据）
-└── +not-found.tsx
-```
-> **⚠️ [CRITICAL]**： `app/index.tsx` 优先级高于 `(tabs)/index.tsx`，会导致首页无 Tab Bar。**当有(tabs)/index.tsx时必须删除 `app/index.tsx`**。
+### 纠错与二次分发
 
-**根布局配置** `client/app/_layout.tsx`：
+本项目以 MIT 协议开源，可自由 fork、修改、再分发。请保留 LICENSE 中的版权信息。
 
-以下仅为代码片段供写法参考
+## 隐私说明
 
-```tsx
-<Stack screenOptions={{ headerShown: false }}>
-  <Stack.Screen name="(tabs)" />
-  <Stack.Screen name="detail" />
-</Stack>
-```
+- 本应用**不收集、不存储、不上传任何个人信息**。
+- 所有数据（音量预设、主题、开关状态）仅保存在**设备本地**（AsyncStorage），卸载即清除。
+- 广告功能**默认关闭**；即便开启，涉及的也仅为广告 SDK 网络请求，与你的个人数据无关，且你可以随时在配置中关闭。
 
-**应用入口** `client/app/(tabs)/index.tsx`：
-```tsx
-export { default } from "@/screens/home";
-```
+## 许可证
 
-**Tab 布局配置** `client/app/(tabs)/_layout.tsx`：
+本项目基于 [MIT License](./LICENSE) 开源。
 
-```tsx
-import { Tabs } from 'expo-router';
-import { Platform } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FontAwesome6 } from '@expo/vector-icons';
-import { useCSSVariable } from 'uniwind';
+Copyright (c) 2026 mxshady
 
-export default function TabLayout() {
-  const insets = useSafeAreaInsets();
-  const [background, muted, accent, border] = useCSSVariable([
-    '--color-background',
-    '--color-muted',
-    '--color-accent',
-    '--color-border',
-  ]) as string[];
+## 免责声明
 
-  let tabBarStyle = {
-    backgroundColor: background,
-    borderTopWidth: 1,
-    borderTopColor: border,
-  };
-
-  // 用于修复 Web 上高度异常的问题（这个 if 逻辑必须添加）
-  if (Platform.OS === 'web') {
-    tabBarStyle = {
-      ...tabBarStyle,
-      height: 'auto',
-    }
-  }
-
-  return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle,
-        tabBarActiveTintColor: accent,
-        tabBarInactiveTintColor: muted,
-      }}
-    >
-      {/* name 必须与文件名完全一致 */}
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: '首页',
-          tabBarIcon: ({ color }) => (
-            <FontAwesome6 name="house" size={20} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="discover"
-        options={{
-          title: '发现',
-          tabBarIcon: ({ color }) => (
-            <FontAwesome6 name="compass" size={20} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: '我的',
-          tabBarIcon: ({ color }) => (
-            <FontAwesome6 name="user" size={20} color={color} />
-          ),
-        }}
-      />
-    </Tabs>
-  );
-}
-```
-
-**Tab 页面文件** `client/app/(tabs)/index.tsx`：
-```tsx
-export { default } from "@/screens/home";
-```
-
-### 注意事项
-
-在改动 `client/app/_layout.tsx` 前，必须先阅读该文件，再进行修改操作
-
-以下是需要保留的重要逻辑
-
-- 保留 global.css 引入（tailwindcss 生效的关键）
-- 保留 Provider 的使用
-
-## 依赖管理与模块导入规范
-
-### 依赖安装
-**禁止**使用 `npm` 或 `yarn`，按目录区分安装命令：
-
-| 目录 | 安装命令 | 说明 |
-|------|----------|------|
-| `client/` | `npx expo install <package>` | Expo 会自动选择与 SDK 兼容的版本 |
-| `server/` | `pnpm add <package>` | 使用 pnpm 管理后端依赖 |
-
-```bash
-# client 目录（Expo 项目）
-cd client && npx expo install expo-camera expo-image-picker
-
-# server 目录（Express 项目）
-cd server && pnpm add axios cors
-```
-
-**网络问题处理**：`npx expo install` 可能因网络原因失败，失败时重试 2 次，仍失败则改用 `pnpm add` 安装
-
-## Expo 开发规范
-
-### 路径别名
-
-Expo 配置了 `@/` 路径别名指向 `client/` 目录：
-
-```tsx
-// 正确
-import { Screen } from '@/components/Screen';
-
-// 避免相对路径
-import { Screen } from '../../../components/Screen';
-```
-
-## 本地开发
-
-`coze dev`：用来首次启动前后端服务，也可以用来重启前后端服务（该命令会先尝试杀掉占用端口的进程，再启动服务）
+- 本软件按“现状”提供，作者不对适销性、特定用途适用性及任何直接 / 间接损失承担任何责任。
+- 不同 Android 设备与系统的媒体音量行为可能存在差异，效果以实际设备为准。
+- 本项目与任何广告平台、操作系统厂商均无关联，也不对任何第三方服务负责。
