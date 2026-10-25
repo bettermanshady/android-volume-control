@@ -1,4 +1,8 @@
-# 智控音量（Android Volume Control）
+# 智控音量 (Android Volume Control)
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+
+> A lightweight open-source Android volume preset tool built with React Native / Expo. Save and apply system media volume presets, plus a notification-bar volume control. No data collection — everything stays on your device.
 
 一个轻量、开源的 Android 系统媒体音量控制工具，用于快速保存和应用音量预设，并在通知栏提供便捷的 ± 音量控件。数据完全保存在本地，不收集任何个人信息。
 
@@ -45,28 +49,32 @@ client/
 - 不同设备的档位数不同（通常 15 档），因此**每档对应的百分比也因设备而异**，无法做到精确 1% 的连续调节。
 - 主界面会显示“本机媒体音量共 N 档，每档约 X%”，帮助理解这一系统限制。
 
+## 已知限制
+
+- 系统媒体音量是整数档位，**无法做到 1% 连续调节**，每档跨度由设备决定。
+- 仅支持 Android：通知栏控件与音量档位模块为 Android 原生实现，iOS 未适配。
+- 通知栏常驻控件需要 Android 13+ 的通知权限。
+
 ## 本地运行与构建
 
-> 项目使用 pnpm workspace（`client/` 为 Expo 前端，`server/` 为 Express 后端，本应用实际只需要前端）。
-
 ```bash
-# 1. 安装根依赖
-npm install
+# 1. 安装 pnpm（若未安装）
+npm install -g pnpm
 
-# 2. 安装前端（client）依赖
-cd client && npm install
+# 2. 安装依赖（仓库根目录，monorepo）
+pnpm install
 
-# 3. 启动开发（Expo 开发服务器）
-npx expo start
+# 3. 启动客户端（Expo）
+cd client && npx expo start
 
-# 4. 构建 Android APK（需在 client 目录并配置好 EAS）
+# 4. 构建 Android APK
 cd client
 npm install -g eas-cli
 eas login
 eas build -p android
 ```
 
-> 提示：客户端依赖建议使用 `npx expo install <pkg>` 安装，以确保与 SDK 版本兼容。
+> 通知栏控件与音量档位控制是原生 Kotlin 实现（`VolumeControl` / `VolumeNotification`），必须在 development build 或正式 APK 中运行，Expo Go 里无法使用。
 
 ## 配置
 
@@ -100,6 +108,10 @@ export const ADS_ENABLED = true;
 - 本应用**不收集、不存储、不上传任何个人信息**。
 - 所有数据（音量预设、主题、开关状态）仅保存在**设备本地**（AsyncStorage），卸载即清除。
 - 广告功能**默认关闭**；即便开启，涉及的也仅为广告 SDK 网络请求，与你的个人数据无关，且你可以随时在配置中关闭。
+
+## 贡献
+
+欢迎提 Issue 和 PR。提交前请确保：不引入真实广告位 ID / 密钥 / 签名文件；改动原生模块时在真机上验证。
 
 ## 许可证
 
