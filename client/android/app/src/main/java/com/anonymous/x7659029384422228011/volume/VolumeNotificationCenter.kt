@@ -51,12 +51,19 @@ object VolumeNotificationCenter {
         return if (max > 0) ((idx * 100) / max).coerceIn(0, 100) else 0
     }
 
-    /** 设置媒体音量为指定百分比 0-100 */
+    /** 设置媒体音量为指定百分比 0-100（换算为最近档位后写入并回读） */
     fun setVolume(context: Context, percent: Int) {
         val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        val target = ((percent.coerceIn(0, 100)) * max / 100).coerceIn(0, max)
-        am.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0)
+        val index = Math.round(percent.coerceIn(0, 100) * max / 100f).coerceIn(0, max)
+        am.setStreamVolume(AudioManager.STREAM_MUSIC, index, 0)
+    }
+
+    /** 升降系统媒体音量 1 档（内部自带音量，走系统步进） */
+    fun adjustVolumeIndex(context: Context, delta: Int) {
+        val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val direction = if (delta > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER
+        am.adjustStreamVolume(AudioManager.STREAM_MUSIC, direction, 0)
     }
 
     private fun volumeIconRes(volume: Int): Int = R.drawable.ic_notification_speaker

@@ -14,7 +14,7 @@ import { useFocusEffect } from 'expo-router';
 import { FontAwesome6 } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { Screen } from '@/components/Screen';
-import { VolumeManager } from 'react-native-volume-manager';
+import { volumeEngine } from '@/utils/volumeEngine';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
 import { AppColors } from '@/utils/appTheme';
 import { useAppTheme } from '@/contexts/ThemeContext';
@@ -36,6 +36,7 @@ interface VolumePreset {
 export default function VolumePresetsScreen() {
   const [presets, setPresets] = useState<VolumePreset[]>([]);
   const [currentVolume, setCurrentVolume] = useState(50);
+  const [maxSteps, setMaxSteps] = useState(15);
   const [dialogVisible, setDialogVisible] = useState(false);
   const [editingPreset, setEditingPreset] = useState<VolumePreset | null>(null);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
@@ -44,9 +45,6 @@ export default function VolumePresetsScreen() {
   const { colors, isDark, setMode } = useAppTheme();
   const { syncVolume } = useNotification();
   const soundRef = useRef<Audio.Sound | null>(null);
-  const volumeListenerRef = useRef<{ remove: () => void } | null>(null);
-  const isChangingFromSlider = useRef(false);
-  const sliderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const PRIMARY = colors.primary;
 
@@ -84,9 +82,16 @@ export default function VolumePresetsScreen() {
     }
   }, []);
 
-  // Initialize audio, volume listener, and load presets
+  // 初始化：音频模式 + 提示音；订阅音档引擎；同步一次真实档位；监听系统音量
   useEffect(() => {
-    let mounted = true;
+    let cancelled = false;
+
+    const unsubscribe = volumeEngine.subscribe(() => {
+      if (cancelled) return;
+      const s = volumeEngine.getSnapshot();
+      setMaxSteps(s.max);
+      setCurrentVolume(s.percent);
+    });
 
     const init = async () => {
       try {
@@ -100,85 +105,49 @@ export default function VolumePresetsScreen() {
         const { sound } = await Audio.Sound.createAsync(
           require('@/assets/sounds/beep.wav')
         );
-        if (mounted) {
-          soundRef.current = sound;
-        } else {
+        if (cancelled) {
           await sound.unloadAsync();
+        } else {
+          soundRef.current = sound;
         }
       } catch {
-        // Audio init failed
+        // Audio init failed (提示音非关键)
       }
 
-      try {
-        const result = await VolumeManager.getVolume();
-        if (mounted) {
-          setCurrentVolume(Math.round(result.volume * 100));
-        }
-      } catch {
-        // Volume manager not available (web)
-      }
-
-      if (mounted) {
+      if (!cancelled) {
+        await volumeEngine.sync();
+        volumeEngine.startListening();
         await loadPresets();
       }
     };
 
     init();
 
-    // Listen for hardware volume button changes
-    try {
-      const listener = VolumeManager.addVolumeListener((data) => {
-        if (!isChangingFromSlider.current) {
-          setCurrentVolume(Math.round(data.volume * 100));
-        }
-      });
-      volumeListenerRef.current = listener;
-    } catch {
-      // Volume listener not available
-    }
-
     return () => {
-      mounted = false;
-      if (volumeListenerRef.current) {
-        volumeListenerRef.current.remove();
-      }
+      cancelled = true;
+      unsubscribe();
+      volumeEngine.stopListening();
       if (soundRef.current) {
         soundRef.current.unloadAsync();
-      }
-      if (sliderTimerRef.current) {
-        clearTimeout(sliderTimerRef.current);
       }
     };
   }, [loadPresets]);
 
-  // Refresh volume when screen comes into focus
+  // 页面重新聚焦时回读真实档位
   useFocusEffect(
     useCallback(() => {
-      const refreshVolume = async () => {
-        try {
-          const result = await VolumeManager.getVolume();
-          setCurrentVolume(Math.round(result.volume * 100));
-        } catch {
-          // Volume manager not available
-        }
-      };
-      refreshVolume();
+      volumeEngine.sync();
     }, [])
   );
 
-  // Apply volume to system
-  const applyVolume = async (volume: number) => {
-    const clamped = Math.max(0, Math.min(100, volume));
-    try {
-      isChangingFromSlider.current = true;
-      VolumeManager.setVolume(clamped / 100);
-      setCurrentVolume(clamped);
-      setTimeout(() => {
-        isChangingFromSlider.current = false;
-      }, 300);
-    } catch {
-      isChangingFromSlider.current = false;
-    }
+  // 应用预设：百分比 → 档位 → 写入 → 回读（显示数字永远等于实际档位）
+  const applyPreset = (percent: number) => {
+    volumeEngine.setPercent(percent);
+  };
+
+  // 加减按钮：系统升/降 1 档
+  const handleAdjust = (delta: number) => {
+    volumeEngine.adjustBy(delta);
   };
 
   // Play test beep sound
@@ -253,20 +222,18 @@ export default function VolumePresetsScreen() {
     setDialogVisible(false);
   };
 
-  // Handle slider change with debounced system volume update
+  // 滑块：按最近档位换算显示值，并写入档位（引擎写后回读，保证显示=实际档位）
   const handleSliderChange = (value: number) => {
-    const rounded = Math.round(value);
-    setCurrentVolume(rounded);
-    isChangingFromSlider.current = true;
-
-    if (sliderTimerRef.current) {
-      clearTimeout(sliderTimerRef.current);
-    }
-    sliderTimerRef.current = setTimeout(() => {
-      VolumeManager.setVolume(rounded / 100);
-      isChangingFromSlider.current = false;
-    }, 50);
+    const s = volumeEngine.getSnapshot();
+    const index = Math.max(0, Math.min(s.max, Math.round((value / 100) * s.max)));
+    const snapped = Math.round((index / s.max) * 100);
+    setCurrentVolume(snapped);
+    volumeEngine.setIndex(index);
   };
+
+  // 档位换算说明：本机档数 N 与每档约占百分比
+  const sliderStep = 100 / Math.max(1, maxSteps);
+  const fmtStep = sliderStep.toFixed(1);
 
   const styles = createStyles(colors, PRIMARY);
 
@@ -328,7 +295,7 @@ export default function VolumePresetsScreen() {
               style={styles.slider}
               minimumValue={0}
               maximumValue={100}
-              step={1}
+              step={sliderStep}
               value={currentVolume}
               onValueChange={handleSliderChange}
               minimumTrackTintColor={PRIMARY}
@@ -340,21 +307,25 @@ export default function VolumePresetsScreen() {
           <View style={styles.adjustRow}>
             <TouchableOpacity
               style={styles.adjustBtn}
-              onPress={() => applyVolume(currentVolume - 1)}
+              onPress={() => handleAdjust(-1)}
               activeOpacity={0.7}
             >
               <Text style={styles.adjustBtnText}>−</Text>
             </TouchableOpacity>
-            <Text style={styles.adjustLabel}>步进 1%</Text>
+            <Text style={styles.adjustLabel}>
+              步进 1 档（约 {fmtStep}%）
+            </Text>
             <TouchableOpacity
               style={styles.adjustBtn}
-              onPress={() => applyVolume(currentVolume + 1)}
+              onPress={() => handleAdjust(1)}
               activeOpacity={0.7}
             >
               <Text style={styles.adjustBtnText}>+</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.sliderHint}>拖动滑块微调系统音量</Text>
+          <Text style={styles.sliderHint}>
+            本机媒体音量共 {maxSteps} 档，每档约 {fmtStep}%，无法精确到 1%
+          </Text>
         </View>
 
         {/* Presets Section */}
@@ -381,7 +352,7 @@ export default function VolumePresetsScreen() {
               <PresetCard
                 name={preset.name}
                 volume={preset.volume}
-                onApply={() => applyVolume(preset.volume)}
+                onApply={() => applyPreset(preset.volume)}
                 onPlayTest={playTestBeep}
                 onEdit={() => handleEdit(preset)}
                 onDelete={() => handleDelete(preset.id)}

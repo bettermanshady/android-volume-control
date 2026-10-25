@@ -13,17 +13,15 @@ class VolumeNotificationReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
             VolumeNotificationCenter.ACTION_DECREASE -> {
-                VolumeNotificationCenter.setVolume(
-                    context,
-                    VolumeNotificationCenter.currentVolume(context) - VolumeNotificationCenter.STEP
-                )
+                // 系统媒体音量降 1 档
+                VolumeNotificationCenter.adjustVolumeIndex(context, -1)
+                // 回读实际档位刷新显示
                 VolumeNotificationCenter.show(context, null)
             }
             VolumeNotificationCenter.ACTION_INCREASE -> {
-                VolumeNotificationCenter.setVolume(
-                    context,
-                    VolumeNotificationCenter.currentVolume(context) + VolumeNotificationCenter.STEP
-                )
+                // 系统媒体音量升 1 档
+                VolumeNotificationCenter.adjustVolumeIndex(context, 1)
+                // 回读实际档位刷新显示
                 VolumeNotificationCenter.show(context, null)
             }
         }
