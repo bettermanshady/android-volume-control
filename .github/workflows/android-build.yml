@@ -1,0 +1,102 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'client/**'
+      - '.github/workflows/android-build.yml'
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: assembleRelease (arm64-v8a)
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: |
+          pnpm install --frozen-lockfile || {
+            echo "::warning::frozen-lockfile 安装失败，改用 --ignore-scripts 重试"
+            pnpm install --frozen-lockfile --ignore-scripts
+          }
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK and CMake
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager --install "ndk;27.1.12297006" "cmake;3.22.1" > /dev/null || true
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.1.12297006" >> $GITHUB_ENV
+
+      - name: Generate debug keystore
+        working-directory: client/android/app
+        run: |
+          if [ ! -f debug.keystore ]; then
+            keytool -genkeypair -v \
+              -keystore debug.keystore \
+              -storepass android -keypass android \
+              -alias androiddebugkey \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+      - name: Build release APK
+        working-directory: client/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a \
+            -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g"
+
+      - name: Report APK
+        id: apk
+        working-directory: client/android
+        run: |
+          APK=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          echo "path=$APK" >> $GITHUB_OUTPUT
+          ls -l "$APK"
+          echo "APK 大小: $(du -h "$APK" | cut -f1) ($(stat -c%s "$APK") 字节)"
+          echo "包含的 ABI: $(unzip -l "$APK" | grep -o 'lib/[^/]*' | sort -u | tr '\n' ' ')"
+          {
+            echo "### 构建产物"
+            echo ""
+            echo "- APK 大小：**$(du -h "$APK" | cut -f1)**（$(stat -c%s "$APK") 字节）"
+            echo "- ABI：\`$(unzip -l "$APK" | grep -o 'lib/[^/]*' | sort -u | tr '\n' ' ')\`"
+            echo "- 提交：\`${{ github.sha }}\`"
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: volume-preset-v1.0-arm64-apk
+          path: client/android/${{ steps.apk.outputs.path }}
+          if-no-files-found: error
+          retention-days: 30
