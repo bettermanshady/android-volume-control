@@ -37,7 +37,8 @@ interface VolumePreset {
 export default function VolumePresetsScreen() {
   const [presets, setPresets] = useState<VolumePreset[]>([]);
   const [currentVolume, setCurrentVolume] = useState(50);
-  const [maxSteps, setMaxSteps] = useState(15);
+  const [uiSteps, setUiSteps] = useState(15);
+  const [percentPerStep, setPercentPerStep] = useState(6.7);
   const [dialogVisible, setDialogVisible] = useState(false);
   const [editingPreset, setEditingPreset] = useState<VolumePreset | null>(null);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
@@ -90,7 +91,8 @@ export default function VolumePresetsScreen() {
     const unsubscribe = volumeEngine.subscribe(() => {
       if (cancelled) return;
       const s = volumeEngine.getSnapshot();
-      setMaxSteps(s.max);
+      setUiSteps(s.uiSteps);
+      setPercentPerStep(s.percentPerStep);
       setCurrentVolume(s.percent);
     });
 
@@ -232,9 +234,9 @@ export default function VolumePresetsScreen() {
     volumeEngine.setIndex(index);
   };
 
-  // 档位换算说明：本机档数 N 与每档约占百分比
-  const sliderStep = 100 / Math.max(1, maxSteps);
-  const fmtStep = sliderStep.toFixed(1);
+  // 档位换算说明：UI 档数 N 与每个 UI 档（一次点击实际跨越的档）约占百分比
+  const sliderStep = 100 / Math.max(1, uiSteps);
+  const fmtStep = percentPerStep.toFixed(1);
 
   const styles = createStyles(colors, PRIMARY);
 
@@ -325,7 +327,7 @@ export default function VolumePresetsScreen() {
             </TouchableOpacity>
           </View>
           <Text style={styles.sliderHint}>
-            本机媒体音量共 {maxSteps} 档，每档约 {fmtStep}%，无法精确到 1%
+            本机媒体音量共 {uiSteps} 档，每档约 {fmtStep}%，无法精确到 1%
           </Text>
         </View>
 

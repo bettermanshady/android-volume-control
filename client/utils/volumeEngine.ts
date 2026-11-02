@@ -5,15 +5,19 @@ import { VolumeManager } from 'react-native-volume-manager';
 const native = (NativeModules as any).VolumeControl;
 
 export interface VolumeSnapshot {
-  /** 最大档位（getStreamMaxVolume） */
+  /** 最大档位（getStreamMaxVolume，系统内部档位总数，可能远大于 UI 档数） */
   max: number;
-  /** 当前档位（getStreamVolume） */
+  /** 当前档位（getStreamVolume，内部档位） */
   index: number;
   /** 显示百分比 = round(index / max * 100)，永远等于实际档位换算值 */
   percent: number;
-  /** 滑块步长 = 100 / max */
+  /** 滑块步长 = 100 / max（内部档位视角，保留兼容） */
   step: number;
-  /** 每档约占百分之（保留 1 位），用于说明文案 */
+  /** 一次系统步进实际跨越的内部档数（实测，如小米为 10） */
+  stepSpan: number;
+  /** UI 档数 = round(max / stepSpan)，即用户点击一次 ± 所跨的「一档」 */
+  uiSteps: number;
+  /** 每个 UI 档约占百分之（= stepSpan / max * 100，保留 1 位），用于说明文案 */
   percentPerStep: number;
 }
 
@@ -25,21 +29,44 @@ export function isVolumeControlSupported(): boolean {
 const DEFAULT_MAX = 15;
 
 class VolumeEngine {
-  private snapshot: VolumeSnapshot = this.build(DEFAULT_MAX, 0);
+  private snapshot: VolumeSnapshot = this.build(DEFAULT_MAX, 0, 1);
   private subscribers = new Set<() => void>();
   private volumeEventListener: { remove: () => void } | null = null;
+  /** 实测步进跨度缓存（0 表示尚未测得） */
+  private measuredStepSpan = 0;
 
-  private build(max: number, index: number): VolumeSnapshot {
+  private build(max: number, index: number, stepSpan: number): VolumeSnapshot {
     const m = Math.max(1, Math.round(max) || DEFAULT_MAX);
     const idx = Math.max(0, Math.min(m, Math.round(index || 0)));
+    const sp = Math.max(1, Math.round(stepSpan) || 1);
     const step = 100 / m;
+    const uiSteps = Math.max(1, Math.round(m / sp));
     return {
       max: m,
       index: idx,
       percent: Math.round((idx / m) * 100),
       step: Math.round(step * 10000) / 10000,
-      percentPerStep: Math.round(step * 10) / 10,
+      stepSpan: sp,
+      uiSteps,
+      // percentPerStep = (stepSpan / max) * 100，保留 1 位小数
+      percentPerStep: Math.round((sp / m) * 1000) / 10,
     };
+  }
+
+  /** 取得一次系统步进实际跨越的内部档数（原生实测并缓存；非 Android 按 1 处理） */
+  private async ensureStepSpan(): Promise<number> {
+    if (this.measuredStepSpan > 0) return this.measuredStepSpan;
+    if (!isVolumeControlSupported()) {
+      this.measuredStepSpan = 1;
+      return 1;
+    }
+    try {
+      const s = await native.getStepSpan();
+      this.measuredStepSpan = Math.max(1, Math.round(s) || 1);
+    } catch {
+      this.measuredStepSpan = 1;
+    }
+    return this.measuredStepSpan;
   }
 
   /** 百分比 → 最近档位（四舍五入，杜绝截断导致的少一档问题） */
@@ -68,7 +95,11 @@ class VolumeEngine {
     if (!isVolumeControlSupported()) {
       try {
         const r = await VolumeManager.getVolume();
-        this.snapshot = this.build(this.snapshot.max, Math.round(r.volume * this.snapshot.max));
+        this.snapshot = this.build(
+          this.snapshot.max,
+          Math.round(r.volume * this.snapshot.max),
+          this.snapshot.stepSpan || 1
+        );
         this.emit();
       } catch {
         // ignore
@@ -78,7 +109,8 @@ class VolumeEngine {
     try {
       const max = await native.getMaxVolume();
       const index = await native.getVolumeIndex();
-      this.snapshot = this.build(max, index);
+      const stepSpan = await this.ensureStepSpan();
+      this.snapshot = this.build(max, index, stepSpan);
       this.emit();
     } catch {
       // ignore
