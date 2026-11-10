@@ -112,3 +112,4 @@ signing*
 android/.gradle/
 # iOS CocoaPods
 ios/Pods/
+*.png
