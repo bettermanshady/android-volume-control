@@ -150,7 +150,7 @@ class VolumeEngine {
     await this.applyReadback();
   }
 
-  /** 升降若干档（加减按钮 / 系统步进），写入后回读 */
+  /** 升降若干档（系统硬件步进，机身音量键视角） */
   async adjustBy(delta: number): Promise<void> {
     if (!isVolumeControlSupported()) {
       await this.setIndex(this.percentToIndex(this.snapshot.percent) + Math.round(delta));
@@ -162,6 +162,19 @@ class VolumeEngine {
       // ignore
     }
     await this.applyReadback();
+  }
+
+  /**
+   * 微调：按百分比步进（App 内 ± 按钮使用，±1% 级精度）。
+   * 以「当前显示百分比 ± 1」为目标换算最近档位写入，
+   * 设备内部档位足够细（如 150 档）时每次点击可变化约 1%。
+   */
+  async adjustPercent(deltaPercent: number): Promise<void> {
+    const target = Math.max(
+      0,
+      Math.min(100, Math.round(this.snapshot.percent) + Math.round(deltaPercent))
+    );
+    await this.setPercent(target);
   }
 
   /** 监听系统音量变化：仅响应媒体流（music），变化后回读实际档位刷新 */

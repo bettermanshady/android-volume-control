@@ -13,12 +13,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
 import { FontAwesome6 } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
+import Toast from 'react-native-toast-message';
 import { Screen } from '@/components/Screen';
 import { volumeEngine } from '@/utils/volumeEngine';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
 import { AppColors } from '@/utils/appTheme';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { useNotification } from '@/contexts/NotificationContext';
+import { showHearingWarning } from '@/utils/volumeNotification';
 import PresetCard from './PresetCard';
 import PresetDialog from './PresetDialog';
 import AdBanner from '@/components/AdBanner';
@@ -63,6 +65,24 @@ export default function VolumePresetsScreen() {
   useEffect(() => {
     syncVolume(currentVolume);
   }, [currentVolume, syncVolume]);
+
+  // 护耳提醒防抖：3 秒内最多提醒一次
+  const lastWarnAtRef = useRef(0);
+
+  // 从 ≤50% 越过到 >50% 时弹高音量损伤提醒（防误触）：App 内 Toast + 通知（后台场景）
+  const fireWarningIfCrossed = (before: number, after: number) => {
+    const now = Date.now();
+    if (before <= 50 && after > 50 && now - lastWarnAtRef.current > 3000) {
+      lastWarnAtRef.current = now;
+      showHearingWarning(after);
+      Toast.show({
+        type: 'error',
+        text1: '高音量提醒',
+        text2: `当前音量 ${after}%，长时间高音量可能损伤听力`,
+        visibilityTime: 2500,
+      });
+    }
+  };
 
   // Load presets from AsyncStorage
   const loadPresets = useCallback(async () => {
@@ -143,14 +163,18 @@ export default function VolumePresetsScreen() {
     }, [])
   );
 
-  // 应用预设：百分比 → 档位 → 写入 → 回读（显示数字永远等于实际档位）
-  const applyPreset = (percent: number) => {
-    volumeEngine.setPercent(percent);
+  // 应用预设：百分比 → 档位 → 写入 → 回读（显示数字永远等于实际档位）；越过 50% 弹护耳提醒
+  const applyPreset = async (percent: number) => {
+    const before = volumeEngine.getSnapshot().percent;
+    await volumeEngine.setPercent(percent);
+    fireWarningIfCrossed(before, volumeEngine.getSnapshot().percent);
   };
 
-  // 加减按钮：系统升/降 1 档
-  const handleAdjust = (delta: number) => {
-    volumeEngine.adjustBy(delta);
+  // 加减按钮：1% 微调（不再走系统粗步进）；越过 50% 弹护耳提醒
+  const handleAdjust = async (delta: number) => {
+    const before = volumeEngine.getSnapshot().percent;
+    await volumeEngine.adjustPercent(delta);
+    fireWarningIfCrossed(before, volumeEngine.getSnapshot().percent);
   };
 
   // Play test beep sound
@@ -225,17 +249,19 @@ export default function VolumePresetsScreen() {
     setDialogVisible(false);
   };
 
-  // 滑块：按最近档位换算显示值，并写入档位（引擎写后回读，保证显示=实际档位）
-  const handleSliderChange = (value: number) => {
+  // 滑块：按最近档位换算显示值，并写入档位（引擎写后回读，保证显示=实际档位）；越过 50% 弹护耳提醒
+  const handleSliderChange = async (value: number) => {
+    const before = volumeEngine.getSnapshot().percent;
     const s = volumeEngine.getSnapshot();
     const index = Math.max(0, Math.min(s.max, Math.round((value / 100) * s.max)));
     const snapped = Math.round((index / s.max) * 100);
     setCurrentVolume(snapped);
-    volumeEngine.setIndex(index);
+    await volumeEngine.setIndex(index);
+    fireWarningIfCrossed(before, volumeEngine.getSnapshot().percent);
   };
 
-  // 档位换算说明：UI 档数 N 与每个 UI 档（一次点击实际跨越的档）约占百分比
-  const sliderStep = 100 / Math.max(1, uiSteps);
+  // 滑块与 ± 按钮统一 1% 微调精度
+  const sliderStep = 1;
   const fmtStep = percentPerStep.toFixed(1);
 
   const styles = createStyles(colors, PRIMARY);
@@ -316,7 +342,7 @@ export default function VolumePresetsScreen() {
               <Text style={styles.adjustBtnText}>−</Text>
             </TouchableOpacity>
             <Text style={styles.adjustLabel}>
-              步进 1 档（约 {fmtStep}%）
+              微调 ±1%
             </Text>
             <TouchableOpacity
               style={styles.adjustBtn}
@@ -327,7 +353,7 @@ export default function VolumePresetsScreen() {
             </TouchableOpacity>
           </View>
           <Text style={styles.sliderHint}>
-            本机媒体音量共 {uiSteps} 档，每档约 {fmtStep}%，无法精确到 1%
+            ± 按钮与滑块均为 1% 微调（机身音量键每次约 {fmtStep}%）；超过 50% 会护耳提醒
           </Text>
         </View>
 

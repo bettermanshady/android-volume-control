@@ -56,6 +56,14 @@ class VolumeNotificationModule(private val reactContext: ReactApplicationContext
     }
 
     @ReactMethod
+    fun showHearingWarning(volume: Int) {
+        if (Build.VERSION.SDK_INT >= 33 && !hasPermissionSync()) {
+            return
+        }
+        VolumeNotificationCenter.showHearingWarning(reactContext, volume.coerceIn(0, 100))
+    }
+
+    @ReactMethod
     fun isShowing(promise: Promise) {
         promise.resolve(showing)
     }

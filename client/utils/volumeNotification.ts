@@ -81,6 +81,17 @@ export async function updateVolumeNotification(volume: number): Promise<void> {
   }
 }
 
+/** 高音量护耳提醒：音量超过 50% 时弹出悬浮横幅通知 */
+export async function showHearingWarning(volume: number): Promise<boolean> {
+  if (!isSupported()) return false;
+  try {
+    native.showHearingWarning(Math.round(volume));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function isNativeShowing(): Promise<boolean> {
   if (!isSupported()) return false;
   try {
