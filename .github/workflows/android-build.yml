@@ -71,6 +71,10 @@ jobs:
 
       - name: Build release APK
         working-directory: client/android
+        env:
+          # pnpm workspace 布局下，Metro 会把入口文件相对 workspace 根解析导致打包失败，
+          # 此变量让 Metro server root 回落到 client 项目目录
+          EXPO_NO_METRO_WORKSPACE_ROOT: '1'
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a \

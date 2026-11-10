@@ -109,7 +109,14 @@ class VolumeNotificationModule(private val reactContext: ReactApplicationContext
             }
         }
         try {
-            reactContext.registerReceiver(receiver, IntentFilter("android.media.VOLUME_CHANGED_ACTION"))
+            // Android 13+（targetSdk 34 起）动态注册广播必须声明导出标志，
+            // 否则可能抛 SecurityException 导致通知栏控件无法随音量刷新。
+            ContextCompat.registerReceiver(
+                reactContext,
+                receiver,
+                IntentFilter("android.media.VOLUME_CHANGED_ACTION"),
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
             volumeReceiver = receiver
         } catch (_: Exception) {
             // 注册失败忽略
