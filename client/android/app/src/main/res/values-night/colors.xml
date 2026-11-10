@@ -1,1 +1,5 @@
-<resources/>
+<resources>
+  <!-- 通知栏音量控件（深色模式：中性亮灰） -->
+  <color name="notif_text_primary">#F2F2F7</color>
+  <color name="notif_icon_tint">#EBEBF0</color>
+</resources>

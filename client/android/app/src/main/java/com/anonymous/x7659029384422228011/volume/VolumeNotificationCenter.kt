@@ -31,9 +31,23 @@ object VolumeNotificationCenter {
 
     const val ACTION_DECREASE = "com.anonymous.x7659029384422228011.VOL_DECREASE"
     const val ACTION_INCREASE = "com.anonymous.x7659029384422228011.VOL_INCREASE"
+    const val ACTION_SET = "com.anonymous.x7659029384422228011.VOL_SET"
+    const val EXTRA_PERCENT = "percent"
 
     /** 步长与 App 内保持一致：1% */
     const val STEP = 1
+
+    /** 假滑块分段数：20 段，每段 5%。
+     *  Android 通知栏 RemoteViews 不支持可拖动 SeekBar，
+     *  用可点击小格代替，点击第 i 格 = 音量设为 (i+1)*5%。 */
+    const val SEGMENT_COUNT = 20
+
+    private val SEGMENT_IDS = intArrayOf(
+        R.id.seg_0, R.id.seg_1, R.id.seg_2, R.id.seg_3, R.id.seg_4,
+        R.id.seg_5, R.id.seg_6, R.id.seg_7, R.id.seg_8, R.id.seg_9,
+        R.id.seg_10, R.id.seg_11, R.id.seg_12, R.id.seg_13, R.id.seg_14,
+        R.id.seg_15, R.id.seg_16, R.id.seg_17, R.id.seg_18, R.id.seg_19
+    )
 
     fun createChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -94,12 +108,30 @@ object VolumeNotificationCenter {
         }
     }
 
-    private fun volumeIconRes(volume: Int): Int = R.drawable.ic_notification_speaker
-
     fun build(context: Context, volume: Int): Notification {
+        val v = volume.coerceIn(0, 100)
+
+        // 配色全部走资源引用（values-night / drawable-night 深浅色自动切换），
+        // 不再运行时取色，避免切换深色模式后通知颜色「过期」
         val views = RemoteViews(context.packageName, R.layout.volume_notification)
-        views.setTextViewText(R.id.notification_volume, "$volume%")
-        views.setImageViewResource(R.id.notification_icon, volumeIconRes(volume))
+        views.setTextViewText(R.id.notification_volume, "$v%")
+
+        // 假滑块：前 filledCount 格显示填充色，其余显示空色
+        val filledCount = Math.round(v * SEGMENT_COUNT / 100f)
+        for (i in 0 until SEGMENT_COUNT) {
+            val segId = SEGMENT_IDS[i]
+            views.setImageViewResource(segId, if (i < filledCount) R.drawable.seg_filled else R.drawable.seg_empty)
+            // 点击第 i 格 → 音量设为 (i+1)*5%；requestCode 必须每格不同，否则 PendingIntent 会被去重
+            val setPI = PendingIntent.getBroadcast(
+                context,
+                100 + i,
+                Intent(context, VolumeNotificationReceiver::class.java)
+                    .setAction(ACTION_SET)
+                    .putExtra(EXTRA_PERCENT, (i + 1) * 100 / SEGMENT_COUNT),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(segId, setPI)
+        }
 
         // 点击通知主体 → 打开 App
         val openPI = PendingIntent.getActivity(

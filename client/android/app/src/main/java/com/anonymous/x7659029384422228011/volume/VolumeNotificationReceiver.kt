@@ -28,6 +28,17 @@ class VolumeNotificationReceiver : BroadcastReceiver() {
                 // 回读实际档位刷新显示
                 VolumeNotificationCenter.show(context, null)
             }
+            VolumeNotificationCenter.ACTION_SET -> {
+                // 滑块点击：直接跳到目标百分比（每格 5%）
+                val percent = intent.getIntExtra(VolumeNotificationCenter.EXTRA_PERCENT, -1)
+                if (percent in 0..100) {
+                    val old = VolumeNotificationCenter.currentVolume(context)
+                    VolumeNotificationCenter.setVolume(context, percent)
+                    val new = VolumeNotificationCenter.currentVolume(context)
+                    VolumeNotificationCenter.showHearingWarningIfNeeded(context, old, new)
+                    VolumeNotificationCenter.show(context, new)
+                }
+            }
         }
     }
 }

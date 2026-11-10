@@ -36,7 +36,17 @@ class VolumeNotificationModule(private val reactContext: ReactApplicationContext
         if (Build.VERSION.SDK_INT >= 33 && !hasPermissionSync()) {
             return
         }
+        // 先立即以传入音量展示一次（服务启动后会自行接管刷新）
         VolumeNotificationCenter.show(reactContext, volume.coerceIn(0, 100))
+        // 通过前台服务持有通知，实现真正常驻（进程被回收后通知仍在）
+        try {
+            ContextCompat.startForegroundService(
+                reactContext,
+                Intent(reactContext, VolumeForegroundService::class.java)
+            )
+        } catch (_: Exception) {
+            // 后台启动前台服务受限时，退回普通常驻通知
+        }
         showing = true
         registerVolumeChangeReceiver()
     }
@@ -52,6 +62,12 @@ class VolumeNotificationModule(private val reactContext: ReactApplicationContext
     fun hideNotification() {
         showing = false
         unregisterVolumeChangeReceiver()
+        // 停止前台服务（服务停止时其通知会一并移除，再显式清除兑底）
+        try {
+            reactContext.stopService(Intent(reactContext, VolumeForegroundService::class.java))
+        } catch (_: Exception) {
+            // ignore
+        }
         VolumeNotificationCenter.hide(reactContext)
     }
 

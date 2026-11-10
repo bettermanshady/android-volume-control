@@ -3,4 +3,7 @@
   <color name="iconBackground">#ffffff</color>
   <color name="colorPrimary">#023c69</color>
   <color name="colorPrimaryDark">#ffffff</color>
+  <!-- 通知栏音量控件（浅色模式：中性深灰） -->
+  <color name="notif_text_primary">#1C1C1E</color>
+  <color name="notif_icon_tint">#3A3A3C</color>
 </resources>

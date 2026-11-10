@@ -4,6 +4,10 @@
   <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
   <uses-permission android:name="android.permission.VIBRATE"/>
+  <!-- 常驻音量控制前台服务 + 开机自启 -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
   <!-- 模板残留的无关权限，显式移除（含依赖库 manifest 合并进来的） -->
   <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" tools:node="remove"/>
   <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" tools:node="remove"/>
@@ -43,6 +47,27 @@
       <intent-filter>
         <action android:name="com.anonymous.x7659029384422228011.VOL_DECREASE"/>
         <action android:name="com.anonymous.x7659029384422228011.VOL_INCREASE"/>
+        <action android:name="com.anonymous.x7659029384422228011.VOL_SET"/>
+      </intent-filter>
+    </receiver>
+
+    <!-- 常驻音量控制前台服务：持有通知栏控件，App 进程被回收后通知仍在 -->
+    <service
+      android:name=".volume.VolumeForegroundService"
+      android:exported="false"
+      android:stopWithTask="false"
+      android:foregroundServiceType="specialUse">
+      <property
+        android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+        android:value="Persistent media volume control notification with in-notification volume adjustment, explicitly requested by the user"/>
+    </service>
+
+    <!-- 开机自启：恢复常驻通知（HyperOS 需允许自启动） -->
+    <receiver
+      android:name=".volume.BootReceiver"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED"/>
       </intent-filter>
     </receiver>
   </application>

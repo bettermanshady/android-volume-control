@@ -1,67 +1,79 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  通知栏音量控件（常驻前台服务通知）
+  单行紧凑布局：[68%] [-] [■■■■■□□□□□ 假滑块 x20] [+]
+  假滑块：Android 通知 RemoteViews 不支持可拖动 SeekBar，
+  用 20 个可点击小格代替，点击第 i 格 = 把音量设为 (i+1)*5%。
+  颜色全部在 Kotlin 端按深/浅色模式运行时注入，避免硬编码不适配。
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
+    android:layout_height="48dp"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:paddingStart="16dp"
-    android:paddingEnd="8dp"
-    android:paddingTop="8dp"
-    android:paddingBottom="8dp">
+    android:paddingStart="10dp"
+    android:paddingEnd="4dp">
 
-    <ImageView
-        android:id="@+id/notification_icon"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
-        android:layout_gravity="center_vertical"
-        android:src="@drawable/ic_notification_speaker"
-        android:contentDescription="音量" />
-
-    <LinearLayout
-        android:layout_width="0dp"
+    <TextView
+        android:id="@+id/notification_volume"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:layout_marginStart="12dp"
-        android:layout_marginEnd="8dp"
-        android:orientation="vertical"
-        android:gravity="center_vertical">
-
-        <TextView
-            android:id="@+id/notification_title"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="媒体音量"
-            android:textSize="13sp"
-            android:textColor="#F5F5F7"
-            android:alpha="0.85" />
-
-        <TextView
-            android:id="@+id/notification_volume"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="50%"
-            android:textSize="24sp"
-            android:textStyle="bold"
-            android:textColor="#F5F5F7"
-            android:layout_marginTop="2dp" />
-    </LinearLayout>
+        android:minWidth="52dp"
+        android:gravity="center"
+        android:text="50%"
+        android:textSize="15sp"
+        android:textColor="@color/notif_text_primary"
+        android:textStyle="bold" />
 
     <ImageButton
         android:id="@+id/notification_decrease"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:layout_gravity="center_vertical"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="2dp"
         android:src="@drawable/ic_action_minus"
+        android:tint="@color/notif_icon_tint"
         android:background="?android:attr/selectableItemBackgroundBorderless"
         android:scaleType="centerInside"
         android:contentDescription="减小音量" />
 
+    <LinearLayout
+        android:id="@+id/notification_slider"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:layout_marginStart="6dp"
+        android:layout_marginEnd="6dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <ImageView android:id="@+id/seg_0"  android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:layout_margin="1dp" android:scaleType="fitXY" android:src="@drawable/seg_empty" android:contentDescription="5%"/>
+        <ImageView android:id="@+id/seg_1"  android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:layout_margin="1dp" android:scaleType="fitXY" android:src="@drawable/seg_empty" android:contentDescription="10%"/>
+        <ImageView android:id="@+id/seg_2"  android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:layout_margin="1dp" android:scaleType="fitXY" android:src="@drawable/seg_empty" android:contentDescription="15%"/>
+        <ImageView android:id="@+id/seg_3"  android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:layout_margin="1dp" android:scaleType="fitXY" android:src="@drawable/seg_empty" android:contentDescription="20%"/>
+        <ImageView android:id="@+id/seg_4"  android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:layout_margin="1dp" android:scaleType="fitXY" android:src="@drawable/seg_empty" android:contentDescription="25%"/>
+        <ImageView android:id="@+id/seg_5"  android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:layout_margin="1dp" android:scaleType="fitXY" android:src="@drawable/seg_empty" android:contentDescription="30%"/>
+        <ImageView android:id="@+id/seg_6"  android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:layout_margin="1dp" android:scaleType="fitXY" android:src="@drawable/seg_empty" android:contentDescription="35%"/>
+        <ImageView android:id="@+id/seg_7"  android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:layout_margin="1dp" android:scaleType="fitXY" android:src="@drawable/seg_empty" android:contentDescription="40%"/>
+        <ImageView android:id="@+id/seg_8"  android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:layout_margin="1dp" android:scaleType="fitXY" android:src="@drawable/seg_empty" android:contentDescription="45%"/>
+        <ImageView android:id="@+id/seg_9"  android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:layout_margin="1dp" android:scaleType="fitXY" android:src="@drawable/seg_empty" android:contentDescription="50%"/>
+        <ImageView android:id="@+id/seg_10" android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:layout_margin="1dp" android:scaleType="fitXY" android:src="@drawable/seg_empty" android:contentDescription="55%"/>
+        <ImageView android:id="@+id/seg_11" android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:layout_margin="1dp" android:scaleType="fitXY" android:src="@drawable/seg_empty" android:contentDescription="60%"/>
+        <ImageView android:id="@+id/seg_12" android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:layout_margin="1dp" android:scaleType="fitXY" android:src="@drawable/seg_empty" android:contentDescription="65%"/>
+        <ImageView android:id="@+id/seg_13" android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:layout_margin="1dp" android:scaleType="fitXY" android:src="@drawable/seg_empty" android:contentDescription="70%"/>
+        <ImageView android:id="@+id/seg_14" android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:layout_margin="1dp" android:scaleType="fitXY" android:src="@drawable/seg_empty" android:contentDescription="75%"/>
+        <ImageView android:id="@+id/seg_15" android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:layout_margin="1dp" android:scaleType="fitXY" android:src="@drawable/seg_empty" android:contentDescription="80%"/>
+        <ImageView android:id="@+id/seg_16" android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:layout_margin="1dp" android:scaleType="fitXY" android:src="@drawable/seg_empty" android:contentDescription="85%"/>
+        <ImageView android:id="@+id/seg_17" android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:layout_margin="1dp" android:scaleType="fitXY" android:src="@drawable/seg_empty" android:contentDescription="90%"/>
+        <ImageView android:id="@+id/seg_18" android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:layout_margin="1dp" android:scaleType="fitXY" android:src="@drawable/seg_empty" android:contentDescription="95%"/>
+        <ImageView android:id="@+id/seg_19" android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:layout_margin="1dp" android:scaleType="fitXY" android:src="@drawable/seg_empty" android:contentDescription="100%"/>
+    </LinearLayout>
+
     <ImageButton
         android:id="@+id/notification_increase"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:layout_gravity="center_vertical"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
         android:src="@drawable/ic_action_plus"
+        android:tint="@color/notif_icon_tint"
         android:background="?android:attr/selectableItemBackgroundBorderless"
         android:scaleType="centerInside"
         android:contentDescription="增大音量" />

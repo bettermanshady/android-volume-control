@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 滑块已填充段（浅色模式色值，深色模式由 drawable-night 覆盖） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#3A3A3C" />
+    <corners android:radius="4dp" />
+</shape>
