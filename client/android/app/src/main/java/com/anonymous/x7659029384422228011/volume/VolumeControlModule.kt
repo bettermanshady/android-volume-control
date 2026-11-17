@@ -5,7 +5,10 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.Handler
+import android.os.Looper
 import androidx.core.content.ContextCompat
+import com.facebook.react.bridge.LifecycleEventListener
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
@@ -20,13 +23,17 @@ import com.facebook.react.bridge.ReactMethod
  * - setVolumeIndex   : setStreamVolume(STREAM_MUSIC, index, 0)（clamp 到 0..max）
  * - adjustVolumeIndex: adjustStreamVolume(STREAM_MUSIC, ADJUST_RAISE/LOWER, 0)（系统步进 1 档）
  *
- * 另外监听系统 VOLUME_CHANGED_ACTION 广播，向 JS 发送 VolumeChanged 事件。
- * 纯事件驱动、无轮询：只有音量真的变化时才唤醒 JS，功耗可忽略。
+ * 另外监听系统 VOLUME_CHANGED_ACTION 广播，向 JS 发送 VolumeChanged 事件；
+ * 并在 Activity 回前台 / 屏幕点亮 / 用户解锁时发送 AppResumed 事件，
+ * 让 JS 主动回读真实档位（息屏时 JS 被冻结，音量事件可能丢失）。
+ * 纯事件驱动、无轮询：只有这些时刻才唤醒 JS。
  */
 class VolumeControlModule(private val reactContext: ReactApplicationContext) :
-    ReactContextBaseJavaModule(reactContext) {
+    ReactContextBaseJavaModule(reactContext), LifecycleEventListener {
 
     override fun getName(): String = "VolumeControl"
+
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     private val audioManager: AudioManager
         get() = reactContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -37,19 +44,40 @@ class VolumeControlModule(private val reactContext: ReactApplicationContext) :
     private var volumeChangeReceiver: BroadcastReceiver? = null
 
     init {
+        reactContext.addLifecycleEventListener(this)
         registerVolumeChangeReceiver()
     }
 
-    /** 系统音量变化 → 发 JS 事件；锁屏/后台期间 JS 被挂起时事件可能丢失，由 AppState 回前台补读兜底 */
+    /** 息屏/后台期间 JS 冻结，音量广播事件可能丢失；回前台由 Activity 生命周期直接补一次 */
+    override fun onHostResume() {
+        signalAppResumed()
+    }
+
+    override fun onHostPause() {}
+
+    override fun onHostDestroy() {}
+
+    private fun emit(eventName: String) {
+        try {
+            reactContext.emitDeviceEvent(eventName)
+        } catch (_: Exception) {
+            // JS 运行时未就绪，忽略
+        }
+    }
+
+    /** 立即 + 400ms 各发一次：覆盖解锁后 JS 运行时恢复较慢的情况 */
+    private fun signalAppResumed() {
+        emit("AppResumed")
+        mainHandler.postDelayed({ emit("AppResumed") }, 400)
+    }
+
+    /** 系统音量变化 → VolumeChanged；屏幕点亮/解锁 → AppResumed（动态注册，前台服务保活进程） */
     private fun registerVolumeChangeReceiver() {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
-                if (intent?.action == "android.media.VOLUME_CHANGED_ACTION") {
-                    try {
-                        reactContext.emitDeviceEvent("VolumeChanged")
-                    } catch (_: Exception) {
-                        // JS 运行时未就绪（如冷启动瞬间），忽略；回前台补读会修正
-                    }
+                when (intent?.action) {
+                    "android.media.VOLUME_CHANGED_ACTION" -> emit("VolumeChanged")
+                    Intent.ACTION_SCREEN_ON, Intent.ACTION_USER_PRESENT -> signalAppResumed()
                 }
             }
         }
@@ -58,12 +86,16 @@ class VolumeControlModule(private val reactContext: ReactApplicationContext) :
             ContextCompat.registerReceiver(
                 reactContext,
                 receiver,
-                IntentFilter("android.media.VOLUME_CHANGED_ACTION"),
+                IntentFilter().apply {
+                    addAction("android.media.VOLUME_CHANGED_ACTION")
+                    addAction(Intent.ACTION_SCREEN_ON)
+                    addAction(Intent.ACTION_USER_PRESENT)
+                },
                 ContextCompat.RECEIVER_NOT_EXPORTED
             )
             volumeChangeReceiver = receiver
         } catch (_: Exception) {
-            // 注册失败：仍有 react-native-volume-manager 监听 + AppState 补读两层兜底
+            // 注册失败：仍有 react-native-volume-manager 监听 + Activity onResume 两层兜底
         }
     }
 
@@ -141,6 +173,11 @@ class VolumeControlModule(private val reactContext: ReactApplicationContext) :
             // ignore
         }
         volumeChangeReceiver = null
+        try {
+            reactContext.removeLifecycleEventListener(this)
+        } catch (_: Exception) {
+            // ignore
+        }
         super.invalidate()
     }
 }

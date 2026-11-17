@@ -33,12 +33,13 @@ class VolumeEngine {
   private subscribers = new Set<() => void>();
   private volumeEventListener: { remove: () => void } | null = null;
   private appStateSubscription: { remove: () => void } | null = null;
+  private appResumeSubscription: { remove: () => void } | null = null;
   private nativeVolumeSubscription: { remove: () => void } | null = null;
   private listening = false;
   /** 刷新去抖定时器：连按音量键 / 多个事件源时合并为一次回读 */
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
-  /** 回前台后的保险补读（与去抖定时器相互独立） */
-  private resyncTimer: ReturnType<typeof setTimeout> | null = null;
+  /** 回前台后的有界补读（最多 3 次、1.2 秒内结束，不是常驻轮询） */
+  private resumeTimers: ReturnType<typeof setTimeout>[] = [];
   /** 实测步进跨度缓存（0 表示尚未测得） */
   private measuredStepSpan = 0;
 
@@ -136,6 +137,24 @@ class VolumeEngine {
     }, delay);
   }
 
+  /**
+   * 回前台补读：立即读一次，并在 350ms / 1200ms 各补一次。
+   * 息屏时 JS 被冻结，系统音量广播事件可能全部丢失，靠这个短窗口把真实档位拉回来；
+   * 窗口结束后不再有任何定时器，空闲时零开销。
+   */
+  private resyncOnResume() {
+    this.resumeTimers.forEach(clearTimeout);
+    this.resumeTimers = [];
+    this.scheduleReadback(0);
+    [350, 1200].forEach((delay) => {
+      const t = setTimeout(() => {
+        this.resumeTimers = this.resumeTimers.filter((x) => x !== t);
+        this.scheduleReadback(0);
+      }, delay);
+      this.resumeTimers.push(t);
+    });
+  }
+
   /** 冷启动 / 页面重新聚焦时同步一次 */
   async sync(): Promise<VolumeSnapshot> {
     await this.applyReadback();
@@ -200,8 +219,9 @@ class VolumeEngine {
    * 监听系统音量变化（全事件驱动，零轮询）：
    * 1) 原生 VOLUME_CHANGED_ACTION 广播 → VolumeChanged 事件（App 前台时实时推送）
    * 2) react-native-volume-manager 监听（兼容 Web / 非原生模块场景）
-   * 3) AppState 变为 active 时补读一次：锁屏/切后台期间 JS 被挂起、广播事件会丢，
-   *    解锁回来后必须回读真实档位，否则显示停留在旧百分比。
+   * 3) AppState 变为 active，或原生发来 AppResumed（Activity onResume /
+   *    SCREEN_ON / USER_PRESENT）时做有界补读：息屏期间 JS 被完全冻结，
+   *    音量广播事件会全部丢失，解锁后必须主动回读真实档位。
    */
   startListening() {
     if (this.listening) return;
@@ -225,21 +245,21 @@ class VolumeEngine {
       } catch {
         // 原生事件通道不可用，仍由音量监听 + 回前台补读兜底
       }
+      try {
+        // 比 AppState 更底层：Activity 恢复 / 屏幕点亮 / 解锁由系统直接触发，
+        // 不依赖 RN 的 AppState 事件（息屏冻结时该事件可能不派发）
+        this.appResumeSubscription = DeviceEventEmitter.addListener(
+          'AppResumed',
+          () => this.resyncOnResume()
+        );
+      } catch {
+        // ignore
+      }
     }
 
     try {
       this.appStateSubscription = AppState.addEventListener('change', (state) => {
-        if (state === 'active') {
-          // 解锁 / 切回前台：立即回读一次
-          this.scheduleReadback(0);
-          // 350ms 后再补一次：部分 ROM 解锁瞬间 AudioManager 档位尚未稳定；
-          // 用独立定时器，避免被去抖逻辑清掉
-          if (this.resyncTimer) clearTimeout(this.resyncTimer);
-          this.resyncTimer = setTimeout(() => {
-            this.resyncTimer = null;
-            this.scheduleReadback(0);
-          }, 350);
-        }
+        if (state === 'active') this.resyncOnResume();
       });
     } catch {
       // AppState 不可用（如 Web），忽略
@@ -272,14 +292,20 @@ class VolumeEngine {
       }
       this.appStateSubscription = null;
     }
+    if (this.appResumeSubscription) {
+      try {
+        this.appResumeSubscription.remove();
+      } catch {
+        // ignore
+      }
+      this.appResumeSubscription = null;
+    }
     if (this.refreshTimer) {
       clearTimeout(this.refreshTimer);
       this.refreshTimer = null;
     }
-    if (this.resyncTimer) {
-      clearTimeout(this.resyncTimer);
-      this.resyncTimer = null;
-    }
+    this.resumeTimers.forEach(clearTimeout);
+    this.resumeTimers = [];
   }
 }
 
