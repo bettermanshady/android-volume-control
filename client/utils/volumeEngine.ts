@@ -1,4 +1,4 @@
-import { NativeModules, Platform } from 'react-native';
+import { NativeModules, Platform, AppState, DeviceEventEmitter } from 'react-native';
 import { VolumeManager } from 'react-native-volume-manager';
 
 // @ts-ignore - 原生模块在 Android 平台由 VolumeControlModule 提供
@@ -32,6 +32,13 @@ class VolumeEngine {
   private snapshot: VolumeSnapshot = this.build(DEFAULT_MAX, 0, 1);
   private subscribers = new Set<() => void>();
   private volumeEventListener: { remove: () => void } | null = null;
+  private appStateSubscription: { remove: () => void } | null = null;
+  private nativeVolumeSubscription: { remove: () => void } | null = null;
+  private listening = false;
+  /** 刷新去抖定时器：连按音量键 / 多个事件源时合并为一次回读 */
+  private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  /** 回前台后的保险补读（与去抖定时器相互独立） */
+  private resyncTimer: ReturnType<typeof setTimeout> | null = null;
   /** 实测步进跨度缓存（0 表示尚未测得） */
   private measuredStepSpan = 0;
 
@@ -117,6 +124,18 @@ class VolumeEngine {
     }
   }
 
+  /**
+   * 合并刷新请求：所有来源（原生事件 / 音量监听 / 回前台）共用一个 80ms 去抖，
+   * 连续按音量键时只回读一次系统档位，不轮询、不常驻唤醒。
+   */
+  private scheduleReadback(delay = 80) {
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
+    this.refreshTimer = setTimeout(() => {
+      this.refreshTimer = null;
+      this.applyReadback();
+    }, delay);
+  }
+
   /** 冷启动 / 页面重新聚焦时同步一次 */
   async sync(): Promise<VolumeSnapshot> {
     await this.applyReadback();
@@ -177,21 +196,58 @@ class VolumeEngine {
     await this.setPercent(target);
   }
 
-  /** 监听系统音量变化：仅响应媒体流（music），变化后回读实际档位刷新 */
+  /**
+   * 监听系统音量变化（全事件驱动，零轮询）：
+   * 1) 原生 VOLUME_CHANGED_ACTION 广播 → VolumeChanged 事件（App 前台时实时推送）
+   * 2) react-native-volume-manager 监听（兼容 Web / 非原生模块场景）
+   * 3) AppState 变为 active 时补读一次：锁屏/切后台期间 JS 被挂起、广播事件会丢，
+   *    解锁回来后必须回读真实档位，否则显示停留在旧百分比。
+   */
   startListening() {
-    if (this.volumeEventListener) return;
+    if (this.listening) return;
+    this.listening = true;
     try {
       this.volumeEventListener = VolumeManager.addVolumeListener((data: any) => {
         // 只更新媒体音量，忽略铃声 / 闹钟 / 通知等流的音量变化带回滑块
         if (data && data.type != null && data.type !== 'music') return;
-        this.applyReadback();
+        this.scheduleReadback();
       });
     } catch {
       // listener not available
     }
+
+    if (Platform.OS === 'android') {
+      try {
+        this.nativeVolumeSubscription = DeviceEventEmitter.addListener(
+          'VolumeChanged',
+          () => this.scheduleReadback()
+        );
+      } catch {
+        // 原生事件通道不可用，仍由音量监听 + 回前台补读兜底
+      }
+    }
+
+    try {
+      this.appStateSubscription = AppState.addEventListener('change', (state) => {
+        if (state === 'active') {
+          // 解锁 / 切回前台：立即回读一次
+          this.scheduleReadback(0);
+          // 350ms 后再补一次：部分 ROM 解锁瞬间 AudioManager 档位尚未稳定；
+          // 用独立定时器，避免被去抖逻辑清掉
+          if (this.resyncTimer) clearTimeout(this.resyncTimer);
+          this.resyncTimer = setTimeout(() => {
+            this.resyncTimer = null;
+            this.scheduleReadback(0);
+          }, 350);
+        }
+      });
+    } catch {
+      // AppState 不可用（如 Web），忽略
+    }
   }
 
   stopListening() {
+    this.listening = false;
     if (this.volumeEventListener) {
       try {
         this.volumeEventListener.remove();
@@ -199,6 +255,30 @@ class VolumeEngine {
         // ignore
       }
       this.volumeEventListener = null;
+    }
+    if (this.nativeVolumeSubscription) {
+      try {
+        this.nativeVolumeSubscription.remove();
+      } catch {
+        // ignore
+      }
+      this.nativeVolumeSubscription = null;
+    }
+    if (this.appStateSubscription) {
+      try {
+        this.appStateSubscription.remove();
+      } catch {
+        // ignore
+      }
+      this.appStateSubscription = null;
+    }
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+    if (this.resyncTimer) {
+      clearTimeout(this.resyncTimer);
+      this.resyncTimer = null;
     }
   }
 }
